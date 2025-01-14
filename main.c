@@ -46,6 +46,8 @@ int check_position(Particle* particle){
 int update_position(Particle* particle){
     particle->position.y = -100 * (particle->velocity.y * GetFrameTime()) + 0.5 * (particle->acceleration.y * GetFrameTime() * GetFrameTime());
     // s = ut + 1/2 at^2
+    //the -100 somehow makes the particles move downwards and also makes them have a better speed, so they move faster
+    //instead of incredibly slow
 
 }
 
@@ -60,12 +62,14 @@ int update_velocity(Particle* particle){
 
 }
 
-int update_acceleration(Particle* particle){ // I think acceleration might only change when we start adding collisions, as at the moment we are assuming no air resistance
+int update_acceleration(Particle* particle){
+     // I think acceleration might only change when we start adding collisions, as at the moment we are assuming no air resistance
+     // and acceleration is constant in the y direction
 
 
 }
 
-//TODO i need to always initialise particles with an acceleration in the y direction of 9.81 and then add ontop of that the initial acceleration (I think this has been done)
+//TODO I need to always initialise particles with an acceleration in the y direction of 9.81 and then add ontop of that the initial acceleration (I think this has been done)
 int main(void){
     //                   position         velocity         acceleration
     Particle p1 = {{0.0f,22.5f,0.0f}, {2.0f,1.0f,5.0f}, {2.0f,4.905 + 1.0f,2.0f}}; //the 4.905 + is accounting for gravity. Even if a particle has 0 initial acceleration, it still falls due to gravity
