@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include "raylib.h"
 #include "raymath.h"
+#include <time.h>
 
 
 #define SCREEN_HEIGHT 800
@@ -14,6 +15,7 @@ typedef struct{
     Vector3 velocity;
     Vector3 acceleration;
     float radius;
+    Color color;
 
 
 }Particle;
@@ -55,69 +57,56 @@ int update_acceleration(Particle* particle){
 }
 //TODO check collisions
 int check_collisions(Particle* p1, Particle* p2){
-    //calculate the distance between the two particles centers
-    Vector3 vector = Vector3Subtract(p1->position, p2->position);
-    float distance = (float) sqrt(pow(vector.x, 2) + pow(vector.y, 2) + pow(vector.z, 2));
-    if(distance <= p1->radius + p2->radius){
-        //we need to move the particles away from each other along a line which passes through both their centres
-        //Vector3 a = p1->position;
-        //float alpha;
-        //Vector3 r = Vector3Add(a, Vector3Scale(vector, alpha)); //this is the line passing through the centers of both particles
-        //so r is the vector equation of the line passing through the centers of p1 and p2
 
-        Vector3 normal = Vector3Scale(vector, 1/distance); //normal unit vector
-        float p1_velocity_along_normal =  Vector3DotProduct(p1->velocity, normal);
-        p1->velocity = Vector3Scale(p1->velocity, p1_velocity_along_normal);
+    Vector3 line_through_centers = Vector3Subtract(p1->position, p2->position);
+    float distance = Vector3Length(line_through_centers);
 
-        float p2_velocity_along_normal = Vector3DotProduct(p2->velocity, normal);
-        p2->velocity = Vector3Scale(p2->velocity, p2_velocity_along_normal);
-
-
-
-
-
+    if(distance <= p1->radius + p2->radius){ //if they have collided
+        Vector3 unit_vector = Vector3Normalize(line_through_centers);
+        float v1 = Vector3DotProduct(p1->velocity, unit_vector);
+        float v2 = Vector3DotProduct(p2->velocity, unit_vector); //these give us how much the velocity aligns with the line_through_centers
         
-
-
-
-
-        /*
-        p1->velocity.y = p1->velocity.y * -1;
-        p2->velocity.y = p2->velocity.y * -1;
-
-        p1->velocity.x = p1->velocity.x * -1;
-        p2->velocity.x = p2->velocity.x * -1;
-
-        p1->velocity.z = p1->velocity.z * -1;
-        p2->velocity.z = p2->velocity.z * -1;
-
-        */
-
-        
-
-
-
-        
-
-
-
-
+        p1->velocity = Vector3Add(p1->velocity, Vector3Scale(unit_vector, v2 - v1));
+        p2->velocity = Vector3Add(p2->velocity, Vector3Scale(unit_vector, v1 - v2));
     }
-
 }
 
 //TODO particles have no sense of energy they will always keep moving (elastic collisions)
 //TODO collisions with walls are not detected if they hit a wall or particle not in a frame
 int main(void){
+    srand(time(NULL));
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Particle Simulation");
 
-    //                   position         velocity         acceleration      radius
-    Particle p1 = {{10.0f,15.0f,0.0f}, {-2.0f,-4.0f,0.0f}, {0.0f,-4.905f,0.0f}, 3.0f}; 
-    Particle p2 = {{4.0f,15.0f,0.0f}, {2.0f,6.0f,0.0f}, {0.0f,-4.905f,0.0f}, 3.0f};
-    Particle p3 = {{4.0f,0.0f,0.0f}, {-3.0f,-4.0f,0.0f}, {0.0f,-4.905f,0.0f}, 3.0f};
-    Particle p4 = {{6.0f,-9.0f,0.0f}, {0.0f,-2.0f,0.0f}, {0.0f,-4.905f,0.0f}, 3.0f};
-    Particle p5 = {{8.0f,-12.0f,0.0f}, {10.0f,2.9f,0.0f}, {0.0f,-4.905f,0.0f}, 3.0f};
-    Particle p6 = {{7.0f,-15.0f,0.0f}, {15.0f,1.5f,0.0f}, {0.0f,-4.905f,0.0f}, 3.0f};
+
+    Particle* particles = malloc(sizeof(Particle) * 100); //allocating space on the heap for 100 particles
+    for(int i = 0; i < 100; i++){
+        particles[i].position = (Vector3){0.0f,20.0f,0.0f};
+
+        float vx = ((float) rand() / (float) RAND_MAX) * 10;
+        float vy = ((float) rand() / (float) RAND_MAX) * 10;
+        float vz = ((float) rand() / (float) RAND_MAX) * 10;
+        particles[i].velocity = (Vector3){vx,vy,0.0f};
+
+
+        float ax = ((float) rand() / (float) RAND_MAX) * 10;
+        float ay = ((float) rand() / (float) RAND_MAX) * 10;
+        float az = ((float) rand() / (float) RAND_MAX) * 10;
+        particles[i].acceleration = (Vector3){0.0f,-4.905f,0.0f};
+
+        float radius = ((float) rand() / (float) RAND_MAX) * 3;
+        particles[i].radius = radius;
+
+
+        int r = rand() % 255;
+        int g = rand() % 255;
+        int b = rand() % 255;
+        Color color = {r,g,b,255};
+        particles[i].color = color;
+
+
+    }
+
+
 
     //shader settings
         
@@ -144,12 +133,13 @@ int main(void){
     
     //Vector3 cubePosition = { 0.0f, 0.0f, 0.0f };
     //Vector2 cubeScreenPosition = { 0.0f, 0.0f };
-    SetTargetFPS(144);
+    SetTargetFPS(60);
 
 
     while(!WindowShouldClose()){
         
         BeginDrawing(); //we want to output graphics so start drawing
+        DrawFPS(10,10);
         ClearBackground(WHITE);
         BeginMode3D(camera);
         //UpdateCamera(&camera, CAMERA_THIRD_PERSON);
@@ -157,52 +147,41 @@ int main(void){
        
 
         //DrawGrid(10, 1.0f); // the 10 controls the dimensions of the grid (10x10), the 1.0f controls how big each square is
-        DrawSphere(p1.position, p1.radius, BLUE);
-        DrawSphere(p2.position, p2.radius, RED);
-        DrawSphere(p3.position, p2.radius, GREEN);
-        DrawSphere(p4.position, p2.radius, GREEN);
-        DrawSphere(p5.position, p2.radius, GREEN);
-        DrawSphere(p6.position, p2.radius, GREEN);
 
+
+        
+
+
+        for(int i = 0; i < 100; i++){
+            DrawSphere(particles[i].position, particles[i].radius, particles[i].color);
+        }
+
+
+        for(int i = 0; i < 100; i++){
+            update_velocity(&particles[i]);
+        }
+
+        for(int i = 0; i < 100; i++){
+            update_position(&particles[i]);
+        }
+
+        for(int i = 0; i < 100; i++){
+            check_position(&particles[i]);
+        }
+
+        
+        for(int i = 0; i < 100; i++){
+            for(int j = i + 1; j < 100; j++){
+                check_collisions(&particles[i], &particles[j]);
+            }
+        }
+
+        
     
-        update_velocity(&p1);
-        update_velocity(&p2);
-        update_velocity(&p3);
-        update_velocity(&p4);
-        update_velocity(&p5);
-        update_velocity(&p6);
+        
+   
 
-        update_position(&p1);
-        update_position(&p2);
-        update_position(&p3);
-        update_position(&p4);
-        update_position(&p5);
-        update_position(&p6);
-
-        check_position(&p1);
-        check_position(&p2);
-        check_position(&p3);
-        check_position(&p4);
-        check_position(&p5);
-        check_position(&p6);
-
-       check_collisions(&p1, &p2);
-       check_collisions(&p1, &p3);
-       check_collisions(&p1, &p4);
-       check_collisions(&p1, &p5);
-       check_collisions(&p1, &p6);
-       check_collisions(&p2, &p3);
-       check_collisions(&p2, &p4);
-       check_collisions(&p2, &p5);
-       check_collisions(&p2, &p6);
-       check_collisions(&p3, &p4);
-       check_collisions(&p3, &p5);
-       check_collisions(&p3, &p6);
-       check_collisions(&p4, &p5);
-       check_collisions(&p4, &p6);
-       check_collisions(&p5, &p6);
-        //printf("%f\n", p1.velocity.y);
-
+     
        
 
         
