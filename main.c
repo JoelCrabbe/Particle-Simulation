@@ -4,11 +4,8 @@
 #include "raymath.h"
 #include <time.h>
 
-
 #define SCREEN_HEIGHT 800
 #define SCREEN_WIDTH 800
-
- 
 
 typedef struct{
     Vector3 position; 
@@ -17,17 +14,46 @@ typedef struct{
     float radius;
     Color color;
 
-
 }Particle;
 
 //TODO Need to find out how to get the coordinates of each of the walls of the window
 //I think the top and bottom coordinates of the wall in 2d are y = +- 22.50 because fovy is centered at (0,0,0) and we have half the fov in each direction
 int check_position(Particle* particle){
     //this handles collisions of the particles with the top and bottom edge of the window
-    if(particle->position.y - particle->radius <= -22.50f || particle->position.y + particle->radius >= 22.50f){
+    if(particle->position.y - particle->radius <= -22.50f){
+        Vector3 wall = {particle->position.x, -22.50f, particle->position.z};
+        Vector3 particle_to_wall = Vector3Subtract(particle->position, wall);
+        float distance = Vector3Length(particle_to_wall);
+        float overlap = distance - particle->radius;
+
+        particle->position = Vector3Add(Vector3Scale(particle_to_wall, overlap / 2),particle->position);
         particle->velocity.y *= -1;
     }
-    else if(particle->position.x + particle->radius >= 22.50f || particle->position.x - particle->radius <= -22.50f){
+    else if(particle->position.y + particle->radius >= 22.50f){
+        Vector3 wall = {particle->position.x, 22.50f, particle->position.z};
+        Vector3 particle_to_wall = Vector3Subtract(particle->position, wall);
+        float distance = Vector3Length(particle_to_wall);
+        float overlap = distance - particle->radius;
+
+        particle->position = Vector3Add(Vector3Scale(particle_to_wall, overlap / 2),particle->position);
+        particle->velocity.y *= -1;
+    }
+    else if(particle->position.x + particle->radius >= 22.50f){
+        Vector3 wall = {22.50f, particle->position.y, particle->position.z};
+        Vector3 particle_to_wall = Vector3Subtract(particle->position, wall);
+        float distance = Vector3Length(particle_to_wall);
+        float overlap = distance - particle->radius;
+
+        particle->position = Vector3Add(Vector3Scale(particle_to_wall, overlap / 2),particle->position);
+        particle->velocity.x *= -1;
+    }
+    else if(particle->position.x - particle->radius <= -22.50f){
+        Vector3 wall = {-22.50f, particle->position.y, particle->position.z};
+        Vector3 particle_to_wall = Vector3Subtract(particle->position, wall);
+        float distance = Vector3Length(particle_to_wall);
+        float overlap = distance - particle->radius;
+
+        particle->position = Vector3Add(Vector3Scale(particle_to_wall, overlap / 2),particle->position);
         particle->velocity.x *= -1;
 
     }
@@ -51,10 +77,6 @@ int update_velocity(Particle* particle){
   
 }
 
-int update_acceleration(Particle* particle){
-     // I think acceleration might only change when we start adding collisions, as at the moment we are assuming no air resistance
-
-}
 //TODO check collisions
 int check_collisions(Particle* p1, Particle* p2){
 
@@ -62,26 +84,43 @@ int check_collisions(Particle* p1, Particle* p2){
     float distance = Vector3Length(line_through_centers);
 
     if(distance <= p1->radius + p2->radius){ //if they have collided
+     //update particles position by moving them along the line_through_centres a distance of overlap / 2
+        float overlap = distance - (p1->radius + p2->radius);
         Vector3 unit_vector = Vector3Normalize(line_through_centers);
+
+        //I think to move the particle along the line_through_centers we use r = p + aq
+        // alpha is the overlap and q is the vector between the two particles 
+        p1->position = Vector3Add(Vector3Scale(line_through_centers, overlap / 2), p1->position);
+        p2->position = Vector3Add(Vector3Scale(line_through_centers, overlap / 2), p2->position);
+
+
         float v1 = Vector3DotProduct(p1->velocity, unit_vector);
         float v2 = Vector3DotProduct(p2->velocity, unit_vector); //these give us how much the velocity aligns with the line_through_centers
         
         p1->velocity = Vector3Add(p1->velocity, Vector3Scale(unit_vector, v2 - v1));
         p2->velocity = Vector3Add(p2->velocity, Vector3Scale(unit_vector, v1 - v2));
+
+       
     }
 }
 
 //TODO particles have no sense of energy they will always keep moving (elastic collisions)
-//TODO collisions with walls are not detected if they hit a wall or particle not in a frame
+//TODO collisions with walls are not detected if they hit a wall or particle between frames
 int main(void){
     srand(time(NULL));
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Particle Simulation");
+    //Particle p1 = {{0.0f,20.0f,0.0f}, {0.0f,-2.0f,0.0f}, {0.0f,-4.905f,0.0f}, 0.2f};
+    //Particle p2 = {{0.0f,15.0f,0.0f}, {0.0f,-1.0f,0.0f}, {0.0f,-4.905f,0.0f}, 0.2f};
 
+    int size = 5;
+    Particle* particles = malloc(sizeof(Particle) * size); //allocating space on the heap for 100 particles
+    for(int i = 0; i < size; i++){
 
-    Particle* particles = malloc(sizeof(Particle) * 100); //allocating space on the heap for 100 particles
-    for(int i = 0; i < 100; i++){
-        particles[i].position = (Vector3){0.0f,20.0f,0.0f};
+        float px = ((float) rand() / (float) RAND_MAX) * 22.50;
+        float py = ((float) rand() / (float) RAND_MAX) * 22.50;
+        particles[i].position = (Vector3){px,py,0.0f};
 
+        
         float vx = ((float) rand() / (float) RAND_MAX) * 10;
         float vy = ((float) rand() / (float) RAND_MAX) * 10;
         float vz = ((float) rand() / (float) RAND_MAX) * 10;
@@ -94,42 +133,23 @@ int main(void){
         particles[i].acceleration = (Vector3){0.0f,-4.905f,0.0f};
 
         float radius = ((float) rand() / (float) RAND_MAX) * 3;
-        particles[i].radius = radius;
+        particles[i].radius = 1.2f;
 
 
         int r = rand() % 255;
         int g = rand() % 255;
         int b = rand() % 255;
         Color color = {r,g,b,255};
-        particles[i].color = color;
-
+        particles[i].color = RED;
 
     }
 
-
-
-    //shader settings
-        
-    //camera settings
-    /*
-    Camera camera = { 0 };
-    camera.position = (Vector3){ 10.0f, 10.0f, 10.0f }; // Camera position
-    camera.target = (Vector3){ 0.0f, 0.0f, 0.0f };      // Camera looking at point
-    camera.up = (Vector3){ 0.0f, 1.0f, 0.0f };          // Camera up vector (rotation towards target)
-    camera.fovy = 45.0f;                                // Camera field-of-view Y
-    camera.projection = CAMERA_ORTHOGRAPHIC;             // Camera projection type
-    */
-    
     Camera3D camera = {0};
     camera.position = (Vector3){ 0.0f, 0.0f, 10.0f }; // Camera position in 3D space
     camera.target = (Vector3){ 0.0f, 0.0f, 0.0f };    // Camera looks at this point
     camera.up = (Vector3){ 0.0f, 1.0f, 0.0f };        // Up vector for the camera
     camera.fovy = 45.0f;                              // Field of view 22.5 degrees up and 22.5 degrees down
     camera.projection = CAMERA_ORTHOGRAPHIC;          
-    
-
-    
-
     
     //Vector3 cubePosition = { 0.0f, 0.0f, 0.0f };
     //Vector2 cubeScreenPosition = { 0.0f, 0.0f };
@@ -148,34 +168,34 @@ int main(void){
 
         //DrawGrid(10, 1.0f); // the 10 controls the dimensions of the grid (10x10), the 1.0f controls how big each square is
 
-
+    
         
-
-
-        for(int i = 0; i < 100; i++){
+        for(int i = 0; i < size; i++){
             DrawSphere(particles[i].position, particles[i].radius, particles[i].color);
         }
 
 
-        for(int i = 0; i < 100; i++){
+        for(int i = 0; i < size; i++){
+    
             update_velocity(&particles[i]);
         }
 
-        for(int i = 0; i < 100; i++){
+        for(int i = 0; i < size; i++){
             update_position(&particles[i]);
         }
 
-        for(int i = 0; i < 100; i++){
+        for(int i = 0; i < size; i++){
             check_position(&particles[i]);
         }
 
         
-        for(int i = 0; i < 100; i++){
-            for(int j = i + 1; j < 100; j++){
+        for(int i = 0; i < size; i++){
+            for(int j = i + 1; j < size; j++){
                 check_collisions(&particles[i], &particles[j]);
             }
         }
 
+        
         
     
         
@@ -214,4 +234,5 @@ int main(void){
 
     CloseWindow();
     return 0;
-}
+    }
+
